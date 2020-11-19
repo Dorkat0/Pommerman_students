@@ -1,6 +1,10 @@
 """An example to show how to set up an pommerman game programmatically"""
 import pommerman
 from pommerman import agents
+from student_agents.group05.group05 import group05_agent
+from student_agents.heuristic_agent.heuristic_agent import heuristic_agent
+from student_agents.learning_agent.learning_agent import learning_agent
+from student_agents.very_simple_agent.very_simple_agent import very_simple_agent
 
 
 def main():
@@ -11,7 +15,10 @@ def main():
     # Create a set of agents
     agent_list = [
         agents.SimpleAgent(),
-        agents.SimpleAgent()
+        group05_agent.Group05Agent(),
+        #heuristic_agent.HeuristicAgent(),
+        #learning_agent.LearningAgent(),
+        #very_simple_agent.VerySimpleAgent(),
     ]
     # Make the "Free-For-All" environment using the agent list
     env = pommerman.make('PommeFFACompetition-v0', agent_list)

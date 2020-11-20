@@ -14,6 +14,7 @@ class Group05Agent(agents.BaseAgent):
     def __init__(self, *args, **kwargs):
         super(Group05Agent, self).__init__(*args, **kwargs)
 
+
     def act(self, obs, action_space):
         """
         Every time your agent is required to send a move, this method will be called.
@@ -43,6 +44,10 @@ class Group05Agent(agents.BaseAgent):
             action_space.sample() returns a random move (int)
             6 possible actions in pommerman (integers 0-5)
 
+
+
+
+
         Returns
         -------
         action: int
@@ -54,4 +59,5 @@ class Group05Agent(agents.BaseAgent):
             Bomb (5): Lay a bomb.
         """
 
-        return action_space.sample()
+        action_space = 1
+        return action_space

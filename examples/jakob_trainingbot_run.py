@@ -1,6 +1,8 @@
 """An example to show how to set up an pommerman game programmatically"""
 import pommerman
 from pommerman import agents
+from group05jakob_dqn_try import learning_agent
+from group05jakob_dqn_try import random_no_bomb_agent
 
 def main():
     """Simple function to bootstrap a game."""
@@ -9,8 +11,8 @@ def main():
 
     # Create a set of agents
     agent_list = [
-        agents.SimpleAgent(),
-        agents.SimpleAgent(),
+        random_no_bomb_agent.RandomNoBombAgent(),
+        learning_agent.LearningAgent()
     ]
     # Make the "Free-For-All" environment using the agent list
     env = pommerman.make('PommeFFACompetition-v0', agent_list)

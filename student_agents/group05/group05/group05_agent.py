@@ -58,6 +58,5 @@ class Group05Agent(agents.BaseAgent):
             Right (4): Move right on the board.
             Bomb (5): Lay a bomb.
         """
-
-        action_space = 1
+        action_space = 0
         return action_space

@@ -82,18 +82,15 @@ def optimize_model(optimizer, policy_network, target_network, device,
 
 def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", model_file="model.pt", load_model=False,
           save_model=100, episodes=10000, lr=1e-3, memory_size=100000, min_memory_size=10000, render=False,
-          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50):
+          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50, learn_from_agent_for_n_episodes=0):
     device = torch.device(device_name)
     print("Running on device: {}".format(device))
 
     model_path = os.path.join(model_folder, model_file)
 
     # create the environment
-    env, trainee, trainee_id, opponent, opponent_id = util.create_training_env()
-    # resetting the environment returns observations for both agents
-    state = env.reset()
-    obs_trainee = state[trainee_id]
-    obs_opponent = state[opponent_id]
+    env, trainee, trainee_id, opponent, opponent_id, obs_trainee, obs_opponent = util.create_training_env()
+
     # featurize observations, such that they can be fed to a neural network
     obs_trainee_featurized = featurize_simple(obs_trainee, device)
     obs_size = obs_trainee_featurized.size()
@@ -129,8 +126,12 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
         # decrease epsilon over time
         if len(replay_memory) > min_memory_size and epsilon > eps_end:
             epsilon -= eps_dec
-        action = select_action(policy_network, device, obs_trainee_featurized,
-                               epsilon, env.action_space.n)
+
+        # learn from SimpleAgent()
+        if learn_from_agent_for_n_episodes > episode_count:
+            action = torch.tensor([[trainee.act(obs_trainee, env.action_space)]], device=device, dtype=torch.long)
+        else:
+            action = select_action(policy_network, device, obs_trainee_featurized, epsilon, env.action_space.n)
 
         # taking a step in the environment by providing actions of both agents
         actions = [0] * 2
@@ -139,15 +140,14 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
         actions[opponent_id] = opponent.act(obs_opponent, env.action_space) #bug fix in here removed .n from opponent.act(obs_opponen, env.action_space.n)
         current_state, reward, terminal, info = env.step(actions)
 
-        obs_trainee_featurized_next = featurize_simple(current_state[trainee_id], device)
+        obs_trainee_next = current_state[trainee_id]
+        obs_trainee_featurized_next = featurize_simple(obs_trainee_next, device)
 
         ## making my own reward function
-        if not terminal:
-            reward[trainee_id] += my_reward(obs_trainee_featurized, obs_trainee_featurized_next)
+        #if not terminal:
+        #    reward[trainee_id] += my_reward(obs_trainee_featurized, obs_trainee_featurized_next)
 
         reward_list.append(reward[trainee_id])
-        #if reward[trainee_id] > 0:
-        #    print(reward)
         # preparing transition (s, a, r, s', terminal) to be stored in replay buffer
         reward = float(reward[trainee_id])
         reward = torch.tensor([reward], device=device)
@@ -168,10 +168,8 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
             env.close()
 
             # create new randomized environment
-            env, trainee, trainee_id, opponent, opponent_id = util.create_training_env()
-            state = env.reset()
-            obs_trainee = state[trainee_id]
-            obs_opponent = state[opponent_id]
+            env, trainee, trainee_id, opponent, opponent_id, obs_trainee, obs_opponent = util.create_training_env()
+
             obs_trainee_featurized = featurize_simple(obs_trainee, device)
 
             if episode_count % save_model == 0:
@@ -182,6 +180,7 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
                     episode_count, reward_count, epsilon, len(replay_memory)))
                 reward_count = 0
         else:
+            obs_trainee = obs_trainee_next
             obs_trainee_featurized = obs_trainee_featurized_next
             obs_opponent = current_state[opponent_id]
 
@@ -198,4 +197,4 @@ def my_reward(obs_trainee_featurized:torch.tensor, obs_trainee_featurized_next:t
 
 if __name__ == "__main__":
     model = os.path.join("group05jakob_dqn_try", "resources")
-    train(device_name='cpu', model_folder=model, episodes=2000)
+    train(device_name='cpu', model_folder=model, episodes=2000, learn_from_agent_for_n_episodes=0, render=False)

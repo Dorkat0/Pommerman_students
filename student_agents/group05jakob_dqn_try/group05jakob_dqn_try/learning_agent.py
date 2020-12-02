@@ -16,7 +16,7 @@ class LearningAgent(agents.BaseAgent):
         # place your model in the 'resources' folder and access them like shown here
         # change 'group05jakob_dqn_try' to the name of your own package (e.g. group01)
         data_path = pkg_resources.resource_filename('group05jakob_dqn_try', 'resources')
-        model_file = os.path.join(data_path, 'model.pt')
+        model_file = os.path.join(data_path, 'model_1000runs_500agent_0.05reward.pt')
 
         # loading the trained neural network model
         self.model = net_architecture.DQN(board_size=11, num_boards=7, num_actions=6)

@@ -46,16 +46,16 @@ def put_agent_into_other_side(env, trainee, trainee_id):
         env._board[1][1] = 0
 
         #make space for the unicorn to escape in case it is in the corner
-        env.board[9][10] = 0
-        env.board[10][9] = 0
+        env._board[9][10] = 0
+        env._board[10][9] = 0
 
         env._board[5+random_x][5+random_y]=10
         trainee.set_start_position((5+random_x, 5+random_y))
         trainee.reset()
     else:
         env._board[9][9]=0
-        env.board[0][1] = 0
-        env.board[1][0] = 0
+        env._board[0][1] = 0
+        env._board[1][0] = 0
         env._board[5-random_x][5-random_y]=11
         trainee.set_start_position((5-random_x, 5-random_y))
         trainee.reset()

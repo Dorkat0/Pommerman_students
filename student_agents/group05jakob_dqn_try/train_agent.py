@@ -17,18 +17,20 @@ from group05jakob_dqn_try import util
 from group05jakob_dqn_try.net_input import featurize_simple
 from group05jakob_dqn_try.net_architecture import DQN
 from group05jakob_dqn_try.replay_memory import ReplayMemory, Transition
+from group05 import group05_utils
 
 
-def select_action(policy_network, device, obs, eps, n_actions):
+def select_action(policy_network, device, obs_featurized, obs, eps, n_actions):
     # choose a random action with probability 'eps'
     sample = random.random()
     if sample > eps:
         with torch.no_grad():
             # return action with highest q-value (expected reward of an action in a particular state)
-            return policy_network(obs).max(1)[1].view(1, 1)
+            return policy_network(obs_featurized).max(1)[1].view(1, 1)
     else:
         # return random action
-        return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+        # print(group05_utils.get_possible_movements(obs))
+        return torch.tensor([[random.choice(group05_utils.get_possible_movements(obs))]], device=device, dtype=torch.long)
 
 
 def optimize_model(optimizer, policy_network, target_network, device,
@@ -131,7 +133,7 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
         if learn_from_agent_for_n_episodes > episode_count:
             action = torch.tensor([[trainee.act(obs_trainee, env.action_space)]], device=device, dtype=torch.long)
         else:
-            action = select_action(policy_network, device, obs_trainee_featurized, epsilon, env.action_space.n)
+            action = select_action(policy_network, device, obs_trainee_featurized, obs_trainee, epsilon, env.action_space.n)
 
         # taking a step in the environment by providing actions of both agents
         actions = [0] * 2

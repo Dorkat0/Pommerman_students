@@ -12,6 +12,8 @@ import torch
 from torch.nn.functional import mse_loss
 import random
 import os
+import matplotlib.pyplot as plt
+import time
 
 from group05jakob_dqn_try import util
 from group05jakob_dqn_try.net_input import featurize_simple
@@ -84,7 +86,7 @@ def optimize_model(optimizer, policy_network, target_network, device,
 
 def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", model_file="model.pt", load_model=False,
           save_model=100, episodes=10000, lr=1e-3, memory_size=100000, min_memory_size=10000, render=False,
-          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50, learn_from_agent_for_n_episodes=0):
+          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50, learn_from_agent_for_n_episodes=0, board_size=7, plot=False):
     device = torch.device(device_name)
     print("Running on device: {}".format(device))
 
@@ -94,7 +96,7 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
     env, trainee, trainee_id, opponent, opponent_id, obs_trainee, obs_opponent = util.create_training_env()
 
     # featurize observations, such that they can be fed to a neural network
-    obs_trainee_featurized = featurize_simple(obs_trainee, device)
+    obs_trainee_featurized = featurize_simple(obs_trainee, device, board_size)
     obs_size = obs_trainee_featurized.size()
 
     # create both the policy and the target network
@@ -120,8 +122,15 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
     epsilon = eps_start
 
     reward_list = list()
+    aggregate_reward_list = list()
+    start = time.time()
+    elapsed_time_list = list()
+    optimizer_time = 0
+    optimizer_time_list = list()
+
     # training loop
     while episode_count <= episodes:
+
         if render:
             env.render()
 
@@ -143,7 +152,7 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
         current_state, reward, terminal, info = env.step(actions)
 
         obs_trainee_next = current_state[trainee_id]
-        obs_trainee_featurized_next = featurize_simple(obs_trainee_next, device)
+        obs_trainee_featurized_next = featurize_simple(obs_trainee_next, device, board_size)
 
         ## making my own reward function
         #if not terminal:
@@ -158,8 +167,11 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
 
         # optimize model if minimum size of replay memory is filled
         if len(replay_memory) > min_memory_size:
+            start_optimizer = time.time()
             optimize_model(optimizer, policy_network, target_network, device,
                            replay_memory, batch_size, gamma)
+            end_optimizer = time.time()
+            optimizer_time += (end_optimizer - start_optimizer)
 
         if terminal:
             episode_count += 1
@@ -172,19 +184,46 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
             # create new randomized environment
             env, trainee, trainee_id, opponent, opponent_id, obs_trainee, obs_opponent = util.create_training_env()
 
-            obs_trainee_featurized = featurize_simple(obs_trainee, device)
+            obs_trainee_featurized = featurize_simple(obs_trainee, device, board_size)
 
             if episode_count % save_model == 0:
                 torch.save(policy_network.state_dict(), model_path)
 
             if episode_count % print_stats == 0:
-                print("Episode: {}, Reward: {}, Epsilon: {}, Memory Size: {}".format(
-                    episode_count, reward_count, epsilon, len(replay_memory)))
+                end = time.time()
+                elapsed = end - start
+                elapsed_time_list.append(elapsed)
+                print("Episode: {}, Reward: {}, Epsilon: {}, Memory Size: {}, Elapsed Time: {elapsed:.2f}, Optimizing Time: {optimizer_time:.2f}, Time Percentage of Optimizer: {percentage:.2f}%".format(
+                    episode_count, reward_count, epsilon, len(replay_memory), elapsed=elapsed, optimizer_time=optimizer_time, percentage=(optimizer_time / elapsed)*100))
+                aggregate_reward_list.append(reward_count)
+                optimizer_time_list.append(optimizer_time)
                 reward_count = 0
+                optimizer_time = 0
+                start = time.time()
+
+
         else:
             obs_trainee = obs_trainee_next
             obs_trainee_featurized = obs_trainee_featurized_next
             obs_opponent = current_state[opponent_id]
+
+    print("Total time elapsed=  ", sum(elapsed_time_list))
+    print("Total otimizer time= ")
+    print("Reward list=", aggregate_reward_list)
+
+    if plot:
+        x = aggregate_reward_list
+        y = range(len(aggregate_reward_list))
+        plt.plot(y, x)
+        plt.savefig('reward.png')
+        plt.clf()
+
+        x = elapsed_time_list
+        plt.plot(elapsed_time_list, x, label="time")
+        plt.plot(optimizer_time_list, x, label="optimizer time")
+        plt.savefig('time.png')
+
+
 
 def my_reward(obs_trainee_featurized:torch.tensor, obs_trainee_featurized_next:torch.tensor):
     board = obs_trainee_featurized[0][0]
@@ -199,4 +238,4 @@ def my_reward(obs_trainee_featurized:torch.tensor, obs_trainee_featurized_next:t
 
 if __name__ == "__main__":
     model = os.path.join("group05jakob_dqn_try", "resources")
-    train(device_name='cpu', model_folder=model, episodes=2000, learn_from_agent_for_n_episodes=0, render=False)
+    train(device_name='cpu', model_folder=model, episodes=10000, learn_from_agent_for_n_episodes=8000, render=False, lr=1e-2, board_size=7, plot=True)

@@ -1,7 +1,11 @@
 import random
-import numpy as np
+import time
 
 from pommerman import agents
+from group05 import group05_utils
+from .game_state import game_state_from_obs
+from .node import Node
+from .mcts import MCTS
 
 
 class Group05Agent(agents.BaseAgent):
@@ -22,30 +26,15 @@ class Group05Agent(agents.BaseAgent):
 
     def avoid_bombs(self, obs):
         position = obs['position']
-        #TODO implement
+        # TODO implement
 
     def update_enemy_items(self, obs, old_obs):
         if not None:
-            pos = obs['enemies'][0].value
-            pos = np.where(pos == obs['board'])
-            posY = pos[0][0]
-            posX = pos[1][0]
+            posY, posX = group05_utils.get_enemy_position(obs)
 
             board_status = old_obs['board'][posX][posY]
-            if(board_status in (6,7,8)):
+            if board_status in (6, 7, 8):
                 self.enemy_Items[board_status] = self.enemy_Items.get(board_status) + 1
-
-        """
-            Returns
-            -------
-            action: int
-                Stop (0): This action is a pass.
-                Up (1): Move up on the board.
-                Down (2): Move down on the board.
-                Left (3): Move left on the board.
-                Right (4): Move right on the board.
-                Bomb (5): Lay a bomb.
-            """
 
     def act(self, obs, action_space):
         """
@@ -88,13 +77,33 @@ class Group05Agent(agents.BaseAgent):
             Right (4): Move right on the board.
             Bomb (5): Lay a bomb.
         """
+        # our agent id
+        agent_id = self.agent_id
+        # it is not possible to use pommerman's forward model directly with observations,
+        # therefore we need to convert the observations to a game state
+        game_state = game_state_from_obs(obs, agent_id)
+        root = Node(game_state, agent_id)
+        root_state = root.state  # root state needed for value function
+        # TODO: if you can improve the approximation of the forward model (in 'game_state.py')
+        #   then you can think of reusing the search tree instead of creating a new one all the time
+        tree = MCTS(action_space, agent_id, root_state)  # create tree
+        start_time = time.time()
+        # before we rollout the tree we expand the first set of children
+        root.find_children()
+        # now rollout tree for 450 ms
+        while time.time() - start_time < 0.40:
+            tree.do_rollout(root)
+        move = tree.choose(root)
 
 
         if self.old_obs is not None:
             self.update_enemy_items(obs, self.old_obs)
+        else:
+            print("out enemy is ", obs['enemies'][0].value)     #just for the first time
 
         self.old_obs = obs.copy()
 
-        possible = self.get_possible_movements(obs)
+        possible = group05_utils.get_possible_movements(obs)
 
-        return random.choice(possible)
+        #return random.choice(possible)#
+        return move

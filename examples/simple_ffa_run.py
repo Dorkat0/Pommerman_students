@@ -5,7 +5,7 @@ from student_agents.group05.group05 import group05_agent
 from student_agents.heuristic_agent.heuristic_agent import heuristic_agent
 from student_agents.learning_agent.learning_agent import learning_agent
 from student_agents.very_simple_agent.very_simple_agent import very_simple_agent
-from group05jakob_dqn_try import util
+from student_agents.group05jakob_dqn_try.group05jakob_dqn_try import util
 
 def main():
     """Simple function to bootstrap a game."""
@@ -14,9 +14,10 @@ def main():
 
     # Create a set of agents
     agent_list = [
-        agents.PlayerAgent(),
+        #agents.PlayerAgent(),
+        #agents.SimpleAgent(),
         group05_agent.Group05Agent(),
-        #heuristic_agent.HeuristicAgent(),
+        heuristic_agent.HeuristicAgent(),
         #learning_agent.LearningAgent(),
         #very_simple_agent.VerySimpleAgent(),
     ]
@@ -25,7 +26,7 @@ def main():
     env = pommerman.make('PommeFFACompetition-v0', agent_list)
 
     # Run the episodes just like OpenAI Gym
-    for i_episode in range(3):
+    for i_episode in range(20):
         state = env.reset()
         #util.put_agent_into_other_side(env, agent_list[0], 1)
         done = False
@@ -33,7 +34,7 @@ def main():
             env.render()
             actions = env.act(state)
             state, reward, done, info = env.step(actions)
-        print('Episode {} finished'.format(i_episode))
+        print('Episode {} finished'.format(i_episode), reward)
     env.close()
 
 

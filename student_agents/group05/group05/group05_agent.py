@@ -1,7 +1,7 @@
 import random
-import numpy as np
 
 from pommerman import agents
+from group05 import group05_utils
 
 
 class Group05Agent(agents.BaseAgent):
@@ -26,13 +26,10 @@ class Group05Agent(agents.BaseAgent):
 
     def update_enemy_items(self, obs, old_obs):
         if not None:
-            pos = obs['enemies'][0].value
-            pos = np.where(pos == obs['board'])
-            posY = pos[0][0]
-            posX = pos[1][0]
+            posY, posX = group05_utils.get_enemy_position(obs)
 
             board_status = old_obs['board'][posX][posY]
-            if(board_status in (6,7,8)):
+            if board_status in (6, 7, 8):
                 self.enemy_Items[board_status] = self.enemy_Items.get(board_status) + 1
 
         """
@@ -95,6 +92,6 @@ class Group05Agent(agents.BaseAgent):
 
         self.old_obs = obs.copy()
 
-        possible = self.get_possible_movements(obs)
+        possible = group05_utils.get_possible_movements(obs)
 
         return random.choice(possible)

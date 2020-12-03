@@ -1,4 +1,5 @@
 import numpy as np
+from group05 import group05_utils, group05_agent
 
 from pommerman import agents
 from pommerman import constants
@@ -13,15 +14,18 @@ from pommerman import characters
 #  - bombs: do not consider, which agent placed the bomb,
 #           after explosion this would increase the agent's ammo again
 #  - items: we do not know if an item is placed below a removable tile
-def game_state_from_obs(obs):
+from student_agents.heuristic_agent.heuristic_agent import heuristic_agent
+
+
+def game_state_from_obs(obs, agent_id):
     # TODO: think about removing some of the approximations and replacing them
     #   with exact values (e.g. tracking own and opponent's ammo and using exact flame life)
     game_state = [
         obs["board"],
-        convert_agents(obs["board"]),
+        convert_agents(obs["board"], group05_utils.get_enemy_position(obs)),
         convert_bombs(np.array(obs["bomb_blast_strength"]), np.array(obs["bomb_life"])),
         convert_items(obs["board"]),
-        convert_flames(obs["board"])
+        convert_flames(obs["board"], obs["flame_life"])
     ]
     return game_state
 
@@ -48,13 +52,20 @@ def make_bomb_items(ret):
     return bomb_obj_list
 
 
-def convert_agents(board):
+def convert_agents(board, location):
     """ creates two 'clones' of the actual agents """
     ret = []
     # agent board ids are 10 and 11 in two-player games
     for aid in [10, 11]:
         locations = np.where(board == aid)
-        agt = agents.DummyAgent()
+
+        #TBE differentiate between enemy and our algo
+        posX, posY = location
+        if locations[0] == posX and locations[1] == posY:       #TBE enemy
+            agt = heuristic_agent.HeuristicAgent()
+        else:
+            agt = group05_agent.Group05Agent()                  #TBE our algo
+
         agt.init_agent(aid, constants.GameType.FFA)
         if len(locations[0]) != 0:
             agt.set_start_position((locations[0][0], locations[1][0]))
@@ -80,10 +91,10 @@ def convert_items(board):
     return ret
 
 
-def convert_flames(board):
+def convert_flames(board, flame_life):
     """ creates a list of flame objects - initialized with flame_life=2 """
     ret = []
     locations = np.where(board == constants.Item.Flames.value)
     for r, c in zip(locations[0], locations[1]):
-        ret.append(characters.Flame((r, c)))
+        ret.append(characters.Flame((r, c), flame_life[r][c]))  #TBE: added flamelife as value
     return ret

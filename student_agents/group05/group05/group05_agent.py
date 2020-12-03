@@ -81,7 +81,7 @@ class Group05Agent(agents.BaseAgent):
         agent_id = self.agent_id
         # it is not possible to use pommerman's forward model directly with observations,
         # therefore we need to convert the observations to a game state
-        game_state = game_state_from_obs(obs)
+        game_state = game_state_from_obs(obs, agent_id)
         root = Node(game_state, agent_id)
         root_state = root.state  # root state needed for value function
         # TODO: if you can improve the approximation of the forward model (in 'game_state.py')
@@ -91,7 +91,7 @@ class Group05Agent(agents.BaseAgent):
         # before we rollout the tree we expand the first set of children
         root.find_children()
         # now rollout tree for 450 ms
-        while time.time() - start_time < 0.45:
+        while time.time() - start_time < 0.40:
             tree.do_rollout(root)
         move = tree.choose(root)
 

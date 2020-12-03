@@ -26,7 +26,7 @@ def main():
     env = pommerman.make('PommeFFACompetition-v0', agent_list)
 
     # Run the episodes just like OpenAI Gym
-    for i_episode in range(3):
+    for i_episode in range(20):
         state = env.reset()
         #util.put_agent_into_other_side(env, agent_list[0], 1)
         done = False
@@ -34,7 +34,7 @@ def main():
             env.render()
             actions = env.act(state)
             state, reward, done, info = env.step(actions)
-        print('Episode {} finished'.format(i_episode))
+        print('Episode {} finished'.format(i_episode), reward)
     env.close()
 
 

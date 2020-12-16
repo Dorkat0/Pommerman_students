@@ -1,8 +1,9 @@
 """An example to show how to set up an pommerman game programmatically"""
 import pommerman
 from pommerman import agents
-from group05jakob_dqn_try import learning_agent
-from group05jakob_dqn_try import random_no_bomb_agent
+from student_agents.group05jakob_dqn_try.group05jakob_dqn_try import learning_agent
+from student_agents.group05jakob_dqn_try.group05jakob_dqn_try import random_no_bomb_agent
+from student_agents.group05jakob_dqn_try.group05jakob_dqn_try import util
 
 def main():
     """Simple function to bootstrap a game."""
@@ -20,6 +21,7 @@ def main():
     # Run the episodes just like OpenAI Gym
     for i_episode in range(3):
         state = env.reset()
+        util.put_agent_into_other_side(env, agent_list[0], 0)
         done = False
         while not done:
             env.render()

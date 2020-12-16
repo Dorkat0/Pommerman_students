@@ -16,17 +16,17 @@ class LearningAgent(agents.BaseAgent):
         # place your model in the 'resources' folder and access them like shown here
         # change 'group05jakob_dqn_try' to the name of your own package (e.g. group01)
         data_path = pkg_resources.resource_filename('group05jakob_dqn_try', 'resources')
-        model_file = os.path.join(data_path, 'model_1000runs_500agent_0.05reward.pt')
+        model_file = os.path.join(data_path, '2_model.pt')
 
         # loading the trained neural network model
-        self.model = net_architecture.DQN(board_size=11, num_boards=7, num_actions=6)
+        self.model = net_architecture.DQN(board_size=7, num_boards=6, num_actions=6)
         self.model.load_state_dict(torch.load(model_file, map_location=self.device))
         self.model.eval()
 
     def act(self, obs, action_space):
         # the learning agent uses the neural net to find a move
         # the observation space has to be featurized before it is fed to the model
-        obs_featurized = net_input.featurize_simple(obs, self.device)
+        obs_featurized = net_input.featurize_simple(obs, self.device, board_size=7)
         with torch.no_grad():
             action = self.model(obs_featurized).max(1)[1]  # take highest rated move
         return action.item()

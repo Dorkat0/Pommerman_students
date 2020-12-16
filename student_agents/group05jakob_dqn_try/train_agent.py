@@ -20,6 +20,7 @@ from group05jakob_dqn_try.net_input import featurize_simple
 from group05jakob_dqn_try.net_architecture import DQN
 from group05jakob_dqn_try.replay_memory import ReplayMemory, Transition
 from group05 import group05_utils
+from group05jakob_dqn_try.random_no_bomb_agent import RandomNoBombAgent
 
 
 def select_action(policy_network, device, obs_featurized, obs, eps, n_actions):
@@ -86,7 +87,7 @@ def optimize_model(optimizer, policy_network, target_network, device,
 
 def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", model_file="model.pt", load_model=False,
           save_model=100, episodes=10000, lr=1e-3, memory_size=100000, min_memory_size=10000, render=False,
-          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50, learn_from_agent_for_n_episodes=0, board_size=7, plot=False):
+          eps_start=1.0, eps_end=0.05, eps_dec=0.00001, batch_size=128, gamma=0.99, print_stats=50, learn_from_agent_for_n_episodes=0, board_size=7, plot=False, enemy_bot=RandomNoBombAgent()):
     device = torch.device(device_name)
     print("Running on device: {}".format(device))
 
@@ -158,6 +159,9 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
         #if not terminal:
         #    reward[trainee_id] += my_reward(obs_trainee_featurized, obs_trainee_featurized_next)
 
+        if reward[trainee_id] == -1:
+            reward[trainee_id] = - 0.1
+
         reward_list.append(reward[trainee_id])
         # preparing transition (s, a, r, s', terminal) to be stored in replay buffer
         reward = float(reward[trainee_id])
@@ -207,8 +211,8 @@ def train(device_name="cuda", model_folder="group05jakob_dqn_try/resources", mod
             obs_trainee_featurized = obs_trainee_featurized_next
             obs_opponent = current_state[opponent_id]
 
-    print("Total time elapsed=  ", sum(elapsed_time_list))
-    print("Total otimizer time= ")
+    print("Total time elapsed=  ", sum(elapsed_time_list)/60, "min")
+    print("Total otimizer time= ", sum(elapsed_time_list)/60, "min")
     print("Reward list=", aggregate_reward_list)
 
     if plot:
@@ -238,4 +242,4 @@ def my_reward(obs_trainee_featurized:torch.tensor, obs_trainee_featurized_next:t
 
 if __name__ == "__main__":
     model = os.path.join("group05jakob_dqn_try", "resources")
-    train(device_name='cpu', model_folder=model, episodes=10000, learn_from_agent_for_n_episodes=8000, render=False, lr=1e-2, board_size=7, plot=True)
+    train(device_name='cpu', model_folder=model, episodes=10000, learn_from_agent_for_n_episodes=0, render=False, lr=1e-2, board_size=7, plot=True)

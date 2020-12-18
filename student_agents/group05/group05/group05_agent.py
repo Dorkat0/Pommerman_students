@@ -7,6 +7,8 @@ from .node import Node
 from .mcts import MCTS
 from pommerman import constants
 from pommerman.forward_model import ForwardModel
+from pommerman.constants import Action
+from pommerman.constants import Item
 
 class Group05Agent(agents.BaseAgent):
     """
@@ -41,6 +43,11 @@ class Group05Agent(agents.BaseAgent):
         # save root state
         self.root = None
         self.tree = None
+
+        # connected sets
+        self.reachable_sets = None
+        self.reachable_fringes = None
+        self.connection_to_enemy = None
 
     def get_rollout_list(self):
         return self.rollout_list
@@ -87,6 +94,13 @@ class Group05Agent(agents.BaseAgent):
         self.root = Node(self.get_game_state(), self.agent_id)
         self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree (action space is always 6)
         self.root.find_children()
+
+        self.connection_to_enemy = False
+        self.reachable_sets = [set(), set()]
+        self.reachable_fringes = [list(), list()]
+        #expand 2 sets from the starting position
+        self.expand((1, 1), 0)
+        self.expand((9, 9), 1)
 
         self.rollout_list = list()
         self.initialized = True
@@ -143,6 +157,16 @@ class Group05Agent(agents.BaseAgent):
         if not self.initialized:
             self.initialize(obs)
 
+
+        # update reachable sets and firnge and connection to enemy
+        if not self.connection_to_enemy:
+            for flame in self.curr_flames:
+                if flame.life == 0:
+                    for i in [0, 1]:
+                        for pos in self.reachable_fringes[i]:
+                            self.expand(pos, i)
+                    break
+
         start_time = time.time()
         enemy_position = group05_utils.get_enemy_position(obs)
         self.prev_enemy_action = group05_utils.get_prev_action(obs, self.prev_enemy_pos, enemy_position)
@@ -170,13 +194,13 @@ class Group05Agent(agents.BaseAgent):
 
         # use old tree or create new one
         if prev_action_pair in self.root.children.keys():
-            print("use previous")
+            #print("use previous")
             self.root = self.root.children[prev_action_pair]
         else:
             self.root = Node(self.get_game_state(), self.agent_id)
             self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree
         self.root.find_children()  # before we rollout the tree we expand the first set of children
-        print("build up_time=", time.time() - start_time)
+        #print("build up_time=", time.time() - start_time)
 
 
         start_time = time.time()
@@ -185,7 +209,7 @@ class Group05Agent(agents.BaseAgent):
             self.tree.do_rollout(self.root)
         action = self.tree.choose(self.root)
         self.rollout_list.append(self.tree.N)
-        print("n_rollout = ", self.tree.N)
+        #print("n_rollout = ", self.tree.N)
 
         self.prev_enemy_pos = enemy_position
         self.prev_action = action
@@ -195,3 +219,41 @@ class Group05Agent(agents.BaseAgent):
     def episode_end(self, reward):
         print("episode_end")
         self.initialized = False
+
+    def expand(self, position, agent_id):
+        if position in self.reachable_sets[0] and position in self.reachable_sets[1]: # this is our end condition, our field are connected now
+            self.connection_to_enemy = True
+            return
+        children = list()
+        is_in_fringe = False #add to fringe if there is a wooden wall as neighbor, because the we want to check it each time a bomb exploded
+        for action in range(1, 5): #(1)UP, (2)DOWN, (3)LEFT, (4)RIGHT
+            row = position[0]
+            col = position[1]
+            if action == Action.Up.value:
+                row -= 1
+            elif action == Action.Down.value:
+                row += 1
+            elif action == Action.Left.value:
+                col -= 1
+            elif action == Action.Right.value:
+                col += 1
+
+            if row < 0 or row >= len(self.curr_board) or col < 0 or col >= len(self.curr_board) or self.curr_board[row, col] == Item.Rigid.value or (row, col) in self.reachable_sets[agent_id]:
+                continue
+            elif self.curr_board[row, col] == Item.Wood.value:
+                is_in_fringe = True
+            else:
+                children.append((row, col))
+        if position in self.reachable_fringes[agent_id]:
+            if not is_in_fringe: # this means that the wood was removed so you can also remove it from the fringe
+                self.reachable_fringes[agent_id].remove(position)
+        else:
+            if is_in_fringe:
+                self.reachable_fringes[agent_id].append(position)
+
+        self.reachable_sets[agent_id].add(position)
+        for child in children:
+            self.expand(child, agent_id)
+
+
+

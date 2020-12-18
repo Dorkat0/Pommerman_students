@@ -9,6 +9,7 @@ from pommerman import characters
 from pommerman.constants import Item, POSSIBLE_ACTIONS
 
 from .mcts import MCTSNode
+from .group05_utils import bomb_can_destroy_a_wooden_wall
 
 ACCESSIBLE_TILES = [Item.Passage.value, Item.Kick.value, Item.IncrRange.value, Item.ExtraBomb.value]
 
@@ -35,20 +36,28 @@ class Node(MCTSNode):
         opponent_agent = self.state[1][1 - self.agent_id]
         own_position = own_agent.position
         opponent_position = opponent_agent.position
-        man_dist = manhattan_dist(own_position, opponent_position)
-        if man_dist > 6 and actions[opponent_agent.agent_id] != Action.Stop.value:
-            # we do not model the opponent, if it is more than 6 steps away
-            return True
+        own_action = actions[self.agent_id]
+        opponent_action = actions[opponent_agent.agent_id]
 
         # a lot of moves (e.g. bumping into a wall or wooden tile) actually result in stop moves
         # we do not have to consider, since they lead to the same result as actually playing a stop move
+        if not self._is_legal_action(own_agent, own_position, own_action) or not self._is_legal_action(opponent_agent, opponent_position, opponent_action):
+            return True  # prune action
 
-        if self._is_legal_action(own_position, actions[self.agent_id]) and \
-                self._is_legal_action(opponent_position, actions[opponent_agent.agent_id]):
-            return False  # not prune actions
-        return True
+        man_dist = manhattan_dist(own_position, opponent_position)
+        if man_dist > 6 and opponent_action != Action.Stop.value:
+            # we do not model the opponent, if it is more than 6 steps away
+            return True
 
-    def _is_legal_action(self, position, action):
+        ## own extension
+        #if own_action == Action.Bomb.value:
+        #    if not bomb_can_destroy_a_wooden_wall(own_position, ):
+        #        return True
+
+        return False
+
+
+    def _is_legal_action(self, agent, position, action):
         """ prune moves that lead to stop move"""
         if action == Action.Stop.value:
             return True
@@ -57,9 +66,15 @@ class Node(MCTSNode):
         bombs = [bomb.position for bomb in bombs]
         row = position[0]
         col = position[1]
-        # if it a bomb move, check if there is already a bomb planted on this field
-        if action == Action.Bomb.value and (row, col) in bombs:
-            return False
+        if action == Action.Bomb.value:
+            #print("agent.agent_id=", agent.agent_id, "agent.blast_strength=", agent.blast_strength)
+            ## if ammo is 0 you cannot lay bombs
+            if agent.ammo == 0:
+                return False
+            # if it a bomb move, check if there is already a bomb planted on this field
+            if (row, col) in bombs:
+                return False
+            bomb_can_destroy_a_wooden_wall(board, position, agent.blast_strength)
 
         if action == Action.Up.value:
             row -= 1
@@ -75,6 +90,21 @@ class Node(MCTSNode):
 
         if board[row, col] in [Item.Wood.value, Item.Rigid.value]:
             return False
+
+        # own adding that agent cannot go on boms when he cant kick, or when he can kick, but bomb is at a wall
+        if board[row, col] == Item.Bomb.value:
+            if not agent.can_kick:
+                return False
+            else:
+                # if bomb lays on a wall or at the outer border we cannot cick it
+                if action == Action.Up.value and (row == 0 or board[row-1, col] in [Item.Wood.value, Item.Rigid.value]): #TODO maybe add enemy here because we cant kick if enemy standst there?
+                    return False
+                elif action == Action.Down.value and (row == len(board)-1 or board[row+1, col] in [Item.Wood.value, Item.Rigid.value]):
+                    return False
+                elif action == Action.Left.value and (col == 0 or board[row, col-1] in [Item.Wood.value, Item.Rigid.value]):
+                    return False
+                elif action == Action.Right.value and (col == len(board)-1 or board[row, col+1] in [Item.Wood.value, Item.Rigid.value]):
+                    return False
 
         return True
 

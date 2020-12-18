@@ -1,12 +1,12 @@
-import random
 import time
+import numpy as np
 
 from pommerman import agents
-from group05 import group05_utils
-from .game_state import game_state_from_obs
+from . import group05_utils
 from .node import Node
 from .mcts import MCTS
-
+from pommerman import constants
+from pommerman.forward_model import ForwardModel
 
 class Group05Agent(agents.BaseAgent):
     """
@@ -21,20 +21,82 @@ class Group05Agent(agents.BaseAgent):
 
     def __init__(self, *args, **kwargs):
         super(Group05Agent, self).__init__(*args, **kwargs)
-        self.enemy_Items = {6: 1, 7: 2, 8: False}
-        self.old_obs = None
+        self.prev_enemy_pos = None
+        self.prev_own_pos = None
+        self.rollout_list = None
+        self.enemy_value = None
+        self.own_value = None
+        self.enemy_agent_id = None
 
-    def avoid_bombs(self, obs):
-        position = obs['position']
-        # TODO implement
+        # for forward model:
+        self.initialized = False
+        self.curr_board = None
+        self.curr_agents = None
+        self.curr_bombs = None
+        self.curr_items = None
+        self.curr_flames = None
+        self.prev_action = constants.Action.Stop.value
+        self.prev_enemy_action = constants.Action.Stop.value
 
-    def update_enemy_items(self, obs, old_obs):
-        if not None:
-            posY, posX = group05_utils.get_enemy_position(obs)
+        # save root state
+        self.root = None
+        self.tree = None
 
-            board_status = old_obs['board'][posX][posY]
-            if board_status in (6, 7, 8):
-                self.enemy_Items[board_status] = self.enemy_Items.get(board_status) + 1
+    def get_rollout_list(self):
+        return self.rollout_list
+
+    def initialize(self, obs):
+        """is called every time a new game starts"""
+        if self.agent_id == 0:
+            self.own_value = 10
+            self.enemy_agent_id = 1
+            self.enemy_value = 11
+        else:
+            self.own_value = 11
+            self.enemy_agent_id = 0
+            self.enemy_value = 10
+
+        #copied the agent initialization from gamestate.py
+        agent_list = list()
+        for aid in [10, 11]:
+            locations = np.where(obs["board"] == aid)
+            agt = agents.DummyAgent()
+            agt.init_agent(aid, constants.GameType.FFA)
+            if len(locations[0]) != 0:
+                agt.set_start_position((locations[0][0], locations[1][0]))
+            else:
+                agt.set_start_position((0, 0))
+                agt.is_alive = False
+            agt.reset(is_alive=agt.is_alive)
+            agt.agent_id = aid - 10
+            agent_list.append(agt)
+
+        self.curr_board, self.curr_agents, self.curr_bombs, self.curr_items, self.curr_flames = ForwardModel.step(
+            actions=(constants.Action.Stop.value, constants.Action.Stop.value),
+            curr_board=obs["board"].copy(),
+            curr_agents=agent_list,
+            curr_bombs=[],
+            curr_items={},
+            curr_flames=[]
+        )
+
+        self.prev_enemy_pos = group05_utils.get_enemy_position(obs)
+        self.prev_own_pos = obs["position"]
+
+        #init tree
+        self.root = Node(self.get_game_state(), self.agent_id)
+        self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree (action space is always 6)
+        self.root.find_children()
+
+        self.rollout_list = list()
+        self.initialized = True
+
+    def get_game_state(self):
+        return [self.curr_board,
+                self.curr_agents,
+                self.curr_bombs,
+                self.curr_items,
+                self.curr_flames]
 
     def act(self, obs, action_space):
         """
@@ -77,33 +139,59 @@ class Group05Agent(agents.BaseAgent):
             Right (4): Move right on the board.
             Bomb (5): Lay a bomb.
         """
-        # our agent id
-        agent_id = self.agent_id
-        # it is not possible to use pommerman's forward model directly with observations,
-        # therefore we need to convert the observations to a game state
-        game_state = game_state_from_obs(obs, agent_id)
-        root = Node(game_state, agent_id)
-        root_state = root.state  # root state needed for value function
-        # TODO: if you can improve the approximation of the forward model (in 'game_state.py')
-        #   then you can think of reusing the search tree instead of creating a new one all the time
-        tree = MCTS(action_space, agent_id, root_state)  # create tree
+
+        if not self.initialized:
+            self.initialize(obs)
+
         start_time = time.time()
-        # before we rollout the tree we expand the first set of children
-        root.find_children()
+        enemy_position = group05_utils.get_enemy_position(obs)
+        self.prev_enemy_action = group05_utils.get_prev_action(obs, self.prev_enemy_pos, enemy_position)
+        actual_own_previous_action = group05_utils.get_prev_action(obs, self.prev_own_pos, obs["position"]) #this might happen when there is a collision
+        if self.prev_action != actual_own_previous_action:
+            self.prev_action = actual_own_previous_action
+
+        self.curr_items = group05_utils.convert_items(obs["board"])
+
+        prev_action_pair = (self.prev_action, self.prev_enemy_action)
+        if self.agent_id == 1: # if own agent is second agent then reverse the action pair
+            prev_action_pair = prev_action_pair[::-1]
+
+        self.curr_board, self.curr_agents, self.curr_bombs, self.curr_items, self.curr_flames = ForwardModel.step(
+                prev_action_pair,
+                self.curr_board,
+                self.curr_agents,
+                self.curr_bombs,
+                self.curr_items,
+                self.curr_flames)
+        if not self.curr_agents[self.enemy_agent_id].is_alive: #a check for a bug that was resolved
+            print("enemy_is_alive=", self.curr_agents[self.enemy_agent_id].is_alive)
+        group05_utils.boards_are_equal(obs["board"], self.curr_board) #also a check for a bug that was resolved
+
+
+        # use old tree or create new one
+        if prev_action_pair in self.root.children.keys():
+            print("use previous")
+            self.root = self.root.children[prev_action_pair]
+        else:
+            self.root = Node(self.get_game_state(), self.agent_id)
+            self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree
+        self.root.find_children()  # before we rollout the tree we expand the first set of children
+        print("build up_time=", time.time() - start_time)
+
+
+        start_time = time.time()
         # now rollout tree for 450 ms
         while time.time() - start_time < 0.40:
-            tree.do_rollout(root)
-        move = tree.choose(root)
+            self.tree.do_rollout(self.root)
+        action = self.tree.choose(self.root)
+        self.rollout_list.append(self.tree.N)
+        print("n_rollout = ", self.tree.N)
 
+        self.prev_enemy_pos = enemy_position
+        self.prev_action = action
+        self.prev_own_pos = obs["position"]
+        return action
 
-        if self.old_obs is not None:
-            self.update_enemy_items(obs, self.old_obs)
-        else:
-            print("out enemy is ", obs['enemies'][0].value)     #just for the first time
-
-        self.old_obs = obs.copy()
-
-        possible = group05_utils.get_possible_movements(obs)
-
-        #return random.choice(possible)#
-        return move
+    def episode_end(self, reward):
+        print("episode_end")
+        self.initialized = False

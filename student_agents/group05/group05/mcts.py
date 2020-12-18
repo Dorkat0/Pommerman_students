@@ -7,6 +7,7 @@ This implementation is based on:
 
 from abc import ABC, abstractmethod
 import math
+import random
 
 
 class MCTS:
@@ -14,8 +15,7 @@ class MCTS:
 
     # TODO: you can experiment with the values rollout_depth (depth of simulations)
     #  and exploration_weight here, they are not tuned for Pommerman
-    def __init__(self, action_space, agent_id, root_state, rollout_depth=4, exploration_weight=1):
-        self.action_space = action_space
+    def __init__(self, agent_id, root_state, rollout_depth=4, exploration_weight=1):
         self.root_state = root_state
         self.agent_id = agent_id
         self.rollout_depth = rollout_depth
@@ -30,7 +30,7 @@ class MCTS:
         children = node.get_children()
         if len(children) == 0:
             # choose a move randomly, should hopefully never happen
-            return self.action_space.sample()
+            return random.randint(0,5)
 
         def score(key):
             n = children[key]
@@ -42,6 +42,8 @@ class MCTS:
 
     def do_rollout(self, node):
         """ Execute one tree update step: select, expand, simulate, backpropagate """
+        #if self.N > 2000:
+            #print("nothing")
         path = self._select(node)
         leaf = path[-1]
         self._expand(leaf)

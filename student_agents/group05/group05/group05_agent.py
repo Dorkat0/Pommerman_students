@@ -49,6 +49,9 @@ class Group05Agent(agents.BaseAgent):
         self.reachable_fringes = None
         self.connection_to_enemy = None
 
+    def is_connected_to_enemy(self):
+        return self.connection_to_enemy
+
     def get_rollout_list(self):
         return self.rollout_list
 
@@ -166,6 +169,8 @@ class Group05Agent(agents.BaseAgent):
                         for pos in self.reachable_fringes[i]:
                             self.expand(pos, i)
                     break
+        if self.connection_to_enemy:
+            print("1 connected to enemy")
 
         start_time = time.time()
         enemy_position = group05_utils.get_enemy_position(obs)
@@ -191,14 +196,34 @@ class Group05Agent(agents.BaseAgent):
             print("enemy_is_alive=", self.curr_agents[self.enemy_agent_id].is_alive)
         group05_utils.boards_are_equal(obs["board"], self.curr_board) #also a check for a bug that was resolved
 
+        if self.connection_to_enemy:
+            print("2 connected to enemy")
 
         # use old tree or create new one
-        if prev_action_pair in self.root.children.keys():
-            #print("use previous")
-            self.root = self.root.children[prev_action_pair]
+        if self.connection_to_enemy:
+            # killing mode is on
+            if prev_action_pair in self.root.children.keys():
+                print("killing mode use previous")
+                self.root = self.root.children[prev_action_pair]
+            else:
+                print("killing mode new tree")
+                self.root = Node(self.get_game_state(), self.agent_id)
+                self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree
         else:
-            self.root = Node(self.get_game_state(), self.agent_id)
-            self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree
+            # collecting mode is on
+            action_pair = [0, 0]
+            action_pair[self.agent_id] = prev_action_pair[self.agent_id]
+            action_pair = tuple(action_pair)
+            if action_pair in self.root.children.keys():
+                print("collecting mode use previous")
+                # set enemy action to 0 because we don't care about actual enemy move
+
+                self.root = self.root.children[action_pair]
+            else:
+                print("should never go in here")
+                self.root = Node(self.get_game_state(), self.agent_id)
+                self.tree = MCTS(self.agent_id, self.root.state, rollout_depth=4)  # create tree
+
         self.root.find_children()  # before we rollout the tree we expand the first set of children
         #print("build up_time=", time.time() - start_time)
 
@@ -210,6 +235,7 @@ class Group05Agent(agents.BaseAgent):
         action = self.tree.choose(self.root)
         self.rollout_list.append(self.tree.N)
         #print("n_rollout = ", self.tree.N)
+        self.print_stats()
 
         self.prev_enemy_pos = enemy_position
         self.prev_action = action
@@ -255,5 +281,15 @@ class Group05Agent(agents.BaseAgent):
         for child in children:
             self.expand(child, agent_id)
 
+    def print_stats(self):
+        path = list()
+        self.print_tree(self.root, path)
 
-
+    def print_tree(self, node, path):
+        print(path)
+        path.insert(0, "    ")
+        for key, child in node.children.items():
+            temp_path = path.copy()
+            del temp_path[-1]
+            temp_path.append(key)
+            self.print_tree(child, temp_path)
